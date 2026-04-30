@@ -1,20 +1,13 @@
 {
   "name": "campussync-server",
   "version": "1.0.0",
+  "type": "module",
   "description": "Backend for CampusSync AI Management System",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "npx nodemon server.js"
+    "dev": "nodemon server.js"
   },
-  "keywords": [
-    "react",
-    "express",
-    "campus-management",
-    "ai"
-  ],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "bcryptjs": "^2.4.3",
