@@ -9,7 +9,6 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Context for Sri Manakula Vinayagar Engineering College
 const profile = {
   college: "Sri Manakula Vinayagar Engineering College",
   dept: "Computer Science and Engineering",
@@ -19,41 +18,52 @@ const profile = {
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   
+  console.log("--- NEW REQUEST RECEIVED ---");
+  console.log("User Message:", message);
+
+  // 1. Log Environment Variable Status (Do NOT log the actual key for security)
   if (!process.env.GEMINI_API_KEY) {
-    console.error("❌ API Key is missing from environment variables.");
-    return res.json({ reply: "Configuration error: API Key not found." });
+    console.error("❌ LOG: GEMINI_API_KEY is MISSING in Render Environment Variables");
+    return res.json({ reply: "Server Error: API Key not configured." });
+  } else {
+    console.log("✅ LOG: GEMINI_API_KEY is detected");
   }
 
   try {
+    console.log("📡 LOG: Attempting to initialize GoogleGenerativeAI...");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     
-    // Using gemini-pro for maximum reliability
+    console.log("📡 LOG: Fetching gemini-pro model...");
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    const prompt = `You are CampusSync AI, the assistant for ${profile.college}. 
-    Student Message: "${message}"
-    
-    Instructions:
-    - Respond naturally to greetings like 'hlo' or 'hi'.
-    - If they need a leave letter, use Dept: ${profile.dept} and Attendance: ${profile.attendance}.
-    - If they need a bonafide request for an internship, draft a formal request to the HOD.
-    - Keep responses professional.`;
+    const prompt = `You are CampusSync AI for ${profile.college}. Student says: "${message}"`;
 
+    console.log("📡 LOG: Sending prompt to Google Gemini API...");
     const result = await model.generateContent(prompt);
+    
+    console.log("📡 LOG: Waiting for response...");
     const response = await result.response;
     const text = response.text();
 
-    console.log("✅ Successfully generated response");
+    console.log("✅ LOG: Response received successfully!");
     res.json({ reply: text });
-    
+
   } catch (error) {
-    console.error("❌ Gemini API Error:", error.message);
-    res.json({ reply: "I'm having a small connection issue. Please try sending your message again!" });
+    // 2. Log the EXACT error message to the Render console
+    console.error("❌ LOG: Gemini API Failure!");
+    console.error("Error Message:", error.message);
+    console.error("Error Stack:", error.stack);
+
+    let userFriendlyError = "I'm having a small connection issue. Please try again!";
+    
+    if (error.message.includes("403")) userFriendlyError = "API Key Error: Please check your Gemini Key in Render.";
+    if (error.message.includes("404")) userFriendlyError = "Model Error: 'gemini-pro' not found. Try 'gemini-1.5-flash'.";
+    
+    res.json({ reply: userFriendlyError });
   }
 });
 
-// Use 0.0.0.0 to ensure Render can bind to the port properly
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 CampusSync Backend Live on Port ${PORT}`);
+  console.log(`🚀 DEBUG SERVER LIVE ON PORT ${PORT}`);
 });
