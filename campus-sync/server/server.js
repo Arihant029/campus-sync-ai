@@ -9,7 +9,7 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// Define profile for context
+// Context for Sri Manakula Vinayagar Engineering College
 const profile = {
   college: "Sri Manakula Vinayagar Engineering College",
   dept: "Computer Science and Engineering",
@@ -19,39 +19,41 @@ const profile = {
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   
-  // Verify key exists in Render Environment Variables
   if (!process.env.GEMINI_API_KEY) {
-    return res.json({ reply: "API Key missing in Render settings." });
+    console.error("❌ API Key is missing from environment variables.");
+    return res.json({ reply: "Configuration error: API Key not found." });
   }
 
   try {
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     
-    // Switch to 'gemini-pro' to resolve the 404 error seen in logs
+    // Using gemini-pro for maximum reliability
     const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-    // We pass instructions directly in the prompt to ensure the AI knows its role
-    const prompt = `You are CampusSync AI, the official assistant for ${profile.college}. 
-    The student says: "${message}". 
+    const prompt = `You are CampusSync AI, the assistant for ${profile.college}. 
+    Student Message: "${message}"
     
-    Guidelines:
-    - Respond helpfully to any greetings or general questions.
-    - If they ask for a leave letter, draft one for the ${profile.dept} department mentioning their ${profile.attendance} attendance.
-    - If they ask for a bonafide certificate, draft a request to the HOD for internship purposes.`;
+    Instructions:
+    - Respond naturally to greetings like 'hlo' or 'hi'.
+    - If they need a leave letter, use Dept: ${profile.dept} and Attendance: ${profile.attendance}.
+    - If they need a bonafide request for an internship, draft a formal request to the HOD.
+    - Keep responses professional.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
+    console.log("✅ Successfully generated response");
     res.json({ reply: text });
+    
   } catch (error) {
-    // Log the specific error to Render for easier debugging
-    console.error("❌ Gemini Error:", error.message);
+    console.error("❌ Gemini API Error:", error.message);
     res.json({ reply: "I'm having a small connection issue. Please try sending your message again!" });
   }
 });
 
+// Use 0.0.0.0 to ensure Render can bind to the port properly
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SMVEC Server Live on Port ${PORT}`);
+  console.log(`🚀 CampusSync Backend Live on Port ${PORT}`);
 });
