@@ -18,56 +18,40 @@ const profile = {
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   
-  // DIAGNOSTIC LOGS: Check these in your Render Dashboard
-  const key = process.env.GEMINI_API_KEY;
-  console.log("--- Request Received ---");
-  console.log("Message:", message);
-  console.log("API Key present:", !!key);
-  if (key) {
-    console.log("API Key Length:", key.length);
-    console.log("API Key Starts with:", key.substring(0, 3));
-  }
-
-  if (!key) {
-    return res.json({ reply: "Configuration error: API Key is missing on the server." });
+  // LOGGING: This will show up in your Render Dashboard > Logs
+  console.log("--- New Request ---");
+  console.log("Message received:", message);
+  
+  // 1. Check if the variable exists
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.error("❌ ERROR: GEMINI_API_KEY is not defined in Render Environment Variables.");
+    return res.json({ reply: "API Key is missing on the server. Please check Render settings." });
   }
 
   try {
-    const genAI = new GoogleGenerativeAI(key);
-    
-    // Using gemini-1.5-flash as it is the most compatible with newer library versions
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-flash" 
-    });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are CampusSync AI for ${profile.college}. 
-    Respond to the student: "${message}". 
-    Context: Dept is ${profile.dept}, Attendance is ${profile.attendance}.`;
+    Student asks: "${message}". 
+    Use ${profile.dept} and ${profile.attendance} for letter requests.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
-    console.log("✅ Response generated successfully");
+    console.log("✅ AI Response successful");
     res.json({ reply: text });
 
   } catch (error) {
-    console.error("❌ GEMINI ERROR:", error.message);
-    
-    // This will help us identify if it's an Auth issue (403) or Model issue (404)
-    let errorMessage = "I'm having a connection issue. Please try again.";
-    
-    if (error.message.includes("API_KEY_INVALID") || error.message.includes("403")) {
-      errorMessage = "Invalid API Key. Please regenerate the key in Google AI Studio and update Render.";
-    } else if (error.message.includes("404")) {
-      errorMessage = "Model not found. Server is trying to reconnect...";
-    }
-
-    res.json({ reply: errorMessage });
+    console.error("❌ GEMINI API ERROR:", error.message);
+    res.json({ reply: "The AI is having trouble connecting. Please try again in a moment." });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SMVEC Backend Live on Port ${PORT}`);
+  console.log(`🚀 Server listening on port ${PORT}`);
 });
