@@ -18,40 +18,47 @@ const profile = {
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   
-  // LOGGING: This will show up in your Render Dashboard > Logs
-  console.log("--- New Request ---");
-  console.log("Message received:", message);
-  
-  // 1. Check if the variable exists
+  // Verify key exists
   const apiKey = process.env.GEMINI_API_KEY;
-  
   if (!apiKey) {
-    console.error("❌ ERROR: GEMINI_API_KEY is not defined in Render Environment Variables.");
-    return res.json({ reply: "API Key is missing on the server. Please check Render settings." });
+    return res.json({ reply: "API Key missing in Render settings." });
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
+    // 1.5-flash is faster and less likely to time out on hostel WiFi
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     const prompt = `You are CampusSync AI for ${profile.college}. 
-    Student asks: "${message}". 
-    Use ${profile.dept} and ${profile.attendance} for letter requests.`;
+    Respond to: "${message}". 
+    Use Dept: ${profile.dept} and Attendance: ${profile.attendance} for letter requests.`;
 
-    const result = await model.generateContent(prompt);
+    // Added a fast-response configuration
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig: {
+        maxOutputTokens: 500, // Keeps responses concise to prevent timeouts
+        temperature: 0.7,
+      },
+    });
+
     const response = await result.response;
-    const text = response.text();
-
-    console.log("✅ AI Response successful");
-    res.json({ reply: text });
+    res.json({ reply: response.text() });
 
   } catch (error) {
-    console.error("❌ GEMINI API ERROR:", error.message);
-    res.json({ reply: "The AI is having trouble connecting. Please try again in a moment." });
+    console.error("❌ CONNECTION ERROR:", error.message);
+    
+    // If it's a safety block or heavy traffic, give a specific hint
+    const msg = error.message.toLowerCase();
+    if (msg.includes("safety")) {
+        res.json({ reply: "I can't generate that specific content due to safety filters. Try asking differently!" });
+    } else {
+        res.json({ reply: "The hostel network is a bit slow. Please wait 10 seconds and try again!" });
+    }
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server listening on port ${PORT}`);
+  console.log(`🚀 SMVEC Backend Ready on Port ${PORT}`);
 });
