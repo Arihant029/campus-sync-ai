@@ -18,52 +18,43 @@ const profile = {
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   
-  console.log("--- NEW REQUEST RECEIVED ---");
-  console.log("User Message:", message);
-
-  // 1. Log Environment Variable Status (Do NOT log the actual key for security)
   if (!process.env.GEMINI_API_KEY) {
-    console.error("❌ LOG: GEMINI_API_KEY is MISSING in Render Environment Variables");
-    return res.json({ reply: "Server Error: API Key not configured." });
-  } else {
-    console.log("✅ LOG: GEMINI_API_KEY is detected");
+    return res.json({ reply: "API Key missing in Render settings." });
   }
 
   try {
-    console.log("📡 LOG: Attempting to initialize GoogleGenerativeAI...");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     
-    console.log("📡 LOG: Fetching gemini-pro model...");
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Use the most up-to-date model name format
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `You are CampusSync AI for ${profile.college}. Student says: "${message}"`;
+    const prompt = `You are CampusSync AI for ${profile.college}. 
+    Student says: "${message}"
+    If they need a letter, use Dept: ${profile.dept} and Attendance: ${profile.attendance}.`;
 
-    console.log("📡 LOG: Sending prompt to Google Gemini API...");
     const result = await model.generateContent(prompt);
-    
-    console.log("📡 LOG: Waiting for response...");
     const response = await result.response;
     const text = response.text();
 
-    console.log("✅ LOG: Response received successfully!");
     res.json({ reply: text });
 
   } catch (error) {
-    // 2. Log the EXACT error message to the Render console
-    console.error("❌ LOG: Gemini API Failure!");
-    console.error("Error Message:", error.message);
-    console.error("Error Stack:", error.stack);
-
-    let userFriendlyError = "I'm having a small connection issue. Please try again!";
+    console.error("❌ ERROR:", error.message);
     
-    if (error.message.includes("403")) userFriendlyError = "API Key Error: Please check your Gemini Key in Render.";
-    if (error.message.includes("404")) userFriendlyError = "Model Error: 'gemini-pro' not found. Try 'gemini-1.5-flash'.";
-    
-    res.json({ reply: userFriendlyError });
+    // FALLBACK: If 1.5-flash fails, try the basic 'gemini-pro' one last time
+    try {
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const result = await model.generateContent(message);
+        const response = await result.response;
+        return res.json({ reply: response.text() });
+    } catch (innerError) {
+        res.json({ reply: "I'm having a connection issue with Google's servers. Please try again in a minute." });
+    }
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 DEBUG SERVER LIVE ON PORT ${PORT}`);
+  console.log(`🚀 Final Debug Server Live on Port ${PORT}`);
 });
