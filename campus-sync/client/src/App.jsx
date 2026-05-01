@@ -7,7 +7,9 @@ import {
   Utensils, 
   Bell, 
   Send, 
-  ChevronLeft 
+  ChevronLeft,
+  FileText,
+  GraduationCap
 } from 'lucide-react';
 
 function App() {
@@ -16,12 +18,15 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
 
+  // Your live Render backend URL
   const API_URL = "https://campus-sync-ai.onrender.com/api/chat";
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSend = async (forcedInput = null) => {
+    const messageToSend = forcedInput || input;
+    if (!messageToSend.trim()) return;
+
     setLoading(true);
-    const userMsg = { role: 'user', content: input };
+    const userMsg = { role: 'user', content: messageToSend };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
 
@@ -29,12 +34,15 @@ function App() {
       const response = await fetch(API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input }),
+        body: JSON.stringify({ message: messageToSend }),
       });
       const data = await response.json();
       setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: "Connection Error. Render server is waking up, please wait 30 seconds and try again." }]);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: "Connection Error. The server is waking up (Free Tier). Please wait 30 seconds and try again." 
+      }]);
     }
     setLoading(false);
   };
@@ -43,10 +51,10 @@ function App() {
     const doc = new jsPDF();
     const splitText = doc.splitTextToSize(content, 180);
     doc.text(splitText, 15, 20);
-    doc.save("CampusSync_Document.pdf");
+    doc.save("CampusSync_Official_Document.pdf");
   };
 
-  // DASHBOARD VIEW
+  // --- DASHBOARD VIEW ---
   if (!showChat) {
     return (
       <div className="min-h-screen bg-[#0f172a] text-white p-6 md:p-12 font-sans">
@@ -111,7 +119,7 @@ function App() {
     );
   }
 
-  // CHAT VIEW
+  // --- CHAT VIEW ---
   return (
     <div className="min-h-screen bg-[#020617] text-white flex flex-col p-4 md:p-8">
       <div className="max-w-3xl w-full mx-auto flex flex-col h-[85vh]">
@@ -131,25 +139,52 @@ function App() {
         
         <div className="flex-1 bg-slate-900/90 rounded-[2rem] border border-slate-800 shadow-2xl flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+            
+            {/* WELCOME / QUICK SUGGESTIONS */}
             {messages.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-3">
-                <MessageSquare size={48} className="opacity-20" />
-                <p>Type "leave letter" to start drafting</p>
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-8 py-10">
+                <div className="text-center">
+                  <MessageSquare size={48} className="opacity-20 mx-auto mb-4" />
+                  <p className="text-lg font-medium text-slate-400">How can I help you today?</p>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-md">
+                  <button 
+                    onClick={() => handleSend("Generate a Leave Letter for the HOD")}
+                    className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl hover:bg-blue-600/20 hover:border-blue-500 transition-all text-left group"
+                  >
+                    <FileText className="text-blue-400 mb-2 group-hover:scale-110 transition-transform" size={24} />
+                    <p className="text-blue-400 font-bold text-sm">Leave Letter</p>
+                    <p className="text-xs text-slate-500 mt-1">Draft an official request</p>
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleSend("Draft a request for a Bonafide Certificate")}
+                    className="bg-slate-800/50 border border-slate-700 p-5 rounded-2xl hover:bg-purple-600/20 hover:border-purple-500 transition-all text-left group"
+                  >
+                    <GraduationCap className="text-purple-400 mb-2 group-hover:scale-110 transition-transform" size={24} />
+                    <p className="text-purple-400 font-bold text-sm">Bonafide Request</p>
+                    <p className="text-xs text-slate-500 mt-1">For internship/official use</p>
+                  </button>
+                </div>
               </div>
             )}
             
+            {/* MESSAGE RENDERING */}
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] p-5 rounded-2xl ${
                   msg.role === 'user' 
                   ? 'bg-blue-600 text-white rounded-tr-none' 
-                  : 'bg-slate-800 border border-slate-700 rounded-tl-none'
+                  : 'bg-slate-800 border border-slate-700 rounded-tl-none shadow-xl'
                 }`}>
-                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-medium">{msg.content}</p>
-                  {msg.role === 'assistant' && msg.content.includes("Respectfully") && (
+                  <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{msg.content}</p>
+                  
+                  {/* PDF DOWNLOAD BUTTON (Only if content looks like a letter) */}
+                  {msg.role === 'assistant' && (msg.content.includes("Respectfully") || msg.content.includes("Sincerely") || msg.content.includes("Subject:")) && (
                     <button 
                       onClick={() => downloadPDF(msg.content)} 
-                      className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 p-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
+                      className="mt-4 w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 p-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-md active:scale-95"
                     >
                       Download Official Document (PDF)
                     </button>
@@ -157,27 +192,29 @@ function App() {
                 </div>
               </div>
             ))}
+            
             {loading && (
-              <div className="flex gap-2 items-center text-blue-400 text-sm">
+              <div className="flex gap-2 items-center text-blue-400 text-sm font-medium">
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce"></div>
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
                 <div className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
-                <span>AI is thinking...</span>
+                <span>AI is drafting your response...</span>
               </div>
             )}
           </div>
           
+          {/* INPUT AREA */}
           <div className="p-4 bg-slate-900 border-t border-slate-800">
-            <div className="relative flex items-center">
+            <div className="relative flex items-center max-w-2xl mx-auto w-full">
               <input 
                 className="w-full bg-slate-950 border border-slate-800 p-4 pr-16 rounded-2xl outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-[15px]"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyPress={(e) => e.key === 'Enter' && handleSend()}
-                placeholder="Ask anything..."
+                placeholder="Ask for a letter or certificate..."
               />
               <button 
-                onClick={handleSend}
+                onClick={() => handleSend()}
                 className="absolute right-2 bg-blue-600 hover:bg-blue-700 p-3 rounded-xl transition-all shadow-lg active:scale-95"
               >
                 <Send size={20} />
