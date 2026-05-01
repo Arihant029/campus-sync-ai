@@ -15,48 +15,59 @@ const profile = {
   attendance: "85%"
 };
 
-// 1. Initialize the API at the top level to prevent repeated handshakes
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-
 app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   
-  if (!genAI) {
-    return res.json({ reply: "API Key missing. Please check Render Environment variables." });
+  // DIAGNOSTIC LOGS: Check these in your Render Dashboard
+  const key = process.env.GEMINI_API_KEY;
+  console.log("--- Request Received ---");
+  console.log("Message:", message);
+  console.log("API Key present:", !!key);
+  if (key) {
+    console.log("API Key Length:", key.length);
+    console.log("API Key Starts with:", key.substring(0, 3));
+  }
+
+  if (!key) {
+    return res.json({ reply: "Configuration error: API Key is missing on the server." });
   }
 
   try {
-    // 2. Use 'gemini-1.5-flash' - it is the current standard for fast, stable responses
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const genAI = new GoogleGenerativeAI(key);
+    
+    // Using gemini-1.5-flash as it is the most compatible with newer library versions
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash" 
+    });
 
-    const prompt = `You are the CampusSync AI Assistant for students at ${profile.college}. 
-    Student Message: "${message}"
-    If asked for a leave letter or bonafide certificate, include that they are from ${profile.dept} with ${profile.attendance} attendance. 
-    Always be professional and helpful.`;
+    const prompt = `You are CampusSync AI for ${profile.college}. 
+    Respond to the student: "${message}". 
+    Context: Dept is ${profile.dept}, Attendance is ${profile.attendance}.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
 
+    console.log("✅ Response generated successfully");
     res.json({ reply: text });
 
   } catch (error) {
-    console.error("❌ Gemini API Error:", error.message);
+    console.error("❌ GEMINI ERROR:", error.message);
     
-    // 3. Fallback: If 1.5-flash fails, try the legacy 'gemini-pro' name
-    try {
-      const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const fallbackResult = await fallbackModel.generateContent(message);
-      const fallbackResponse = await fallbackResult.response;
-      return res.json({ reply: fallbackResponse.text() });
-    } catch (innerError) {
-      res.json({ reply: "Connection failed. Ensure your Gemini API Key is valid and try again." });
+    // This will help us identify if it's an Auth issue (403) or Model issue (404)
+    let errorMessage = "I'm having a connection issue. Please try again.";
+    
+    if (error.message.includes("API_KEY_INVALID") || error.message.includes("403")) {
+      errorMessage = "Invalid API Key. Please regenerate the key in Google AI Studio and update Render.";
+    } else if (error.message.includes("404")) {
+      errorMessage = "Model not found. Server is trying to reconnect...";
     }
+
+    res.json({ reply: errorMessage });
   }
 });
 
-// 4. Force binding to 0.0.0.0 for Render compatibility
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SMVEC Server Final Build Live on Port ${PORT}`);
+  console.log(`🚀 SMVEC Backend Live on Port ${PORT}`);
 });
