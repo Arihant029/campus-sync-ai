@@ -20,11 +20,21 @@ app.post('/api/chat', async (req, res) => {
     });
 
     const data = await response.json();
+
+    // THIS IS THE KEY: If Google sends an error, we need to see it
+    if (data.error) {
+      console.error("--- GOOGLE API ERROR ---");
+      console.error("Status:", data.error.status);
+      console.error("Message:", data.error.message);
+      return res.json({ reply: `Google Error: ${data.error.message}` });
+    }
+
     res.json({ reply: data.candidates[0].content.parts[0].text });
   } catch (error) {
-    res.json({ reply: "The hostel network is blocking the AI connection. Switch to a mobile hotspot to verify!" });
+    console.error("--- SERVER CRASH ERROR ---", error.message);
+    res.json({ reply: "The server couldn't reach Google. This might be a regional block." });
   }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0');
+app.listen(PORT, '0.0.0.0', () => console.log("🚀 Debug Server Live"));
