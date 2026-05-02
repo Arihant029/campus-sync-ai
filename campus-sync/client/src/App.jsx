@@ -1,5 +1,5 @@
 // client/src/App.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { jsPDF } from "jspdf";
 import { 
   MessageSquare, LayoutDashboard, Clock, Utensils, 
@@ -12,12 +12,58 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [activeDetail, setActiveDetail] = useState(null);
+  const [isTyping, setIsTyping] = useState(false); // Track typewriter status
+
+  // --- 1. Refs for Auto-scrolling ---
+  const chatEndRef = useRef(null);
 
   const API_URL = "https://campus-sync-ai.onrender.com/api/chat";
 
+  // --- 2. Auto-scroll Effect ---
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, loading]);
+
+  // --- 3. Escape Key Navigation ---
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape' && showChat) {
+        setShowChat(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showChat]);
+
+  // --- 4. Typewriter Effect Logic ---
+  const typeWriter = (text) => {
+    setIsTyping(true);
+    let index = -1;
+    let currentText = "";
+    
+    // Add an empty assistant message to start typing into
+    setMessages(prev => [...prev, { role: 'assistant', content: "" }]);
+
+    const interval = setInterval(() => {
+      index++;
+      if (index < text.length) {
+        currentText += text.charAt(index);
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1].content = currentText;
+          return updated;
+        });
+      } else {
+        clearInterval(interval);
+        setIsTyping(false);
+      }
+    }, 15); // 15ms speed for smooth typewriter feel
+  };
+
   const handleSend = async (forcedInput = null) => {
     const messageToSend = forcedInput || input;
-    if (!messageToSend.trim()) return;
+    // Don't send if empty or if the AI is currently "typing"
+    if (!messageToSend.trim() || isTyping) return;
 
     setLoading(true);
     const userMsg = { role: 'user', content: messageToSend };
@@ -31,14 +77,17 @@ function App() {
         body: JSON.stringify({ message: messageToSend }),
       });
       const data = await response.json();
-      setMessages(prev => [...prev, { role: 'assistant', content: data.reply }]);
+      
+      setLoading(false); // Stop pulse animation before starting typewriter
+      typeWriter(data.reply); // Start the letter-by-letter effect
+      
     } catch (err) {
+      setLoading(false);
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: "The server is waking up. Please wait 30 seconds and try again!" 
       }]);
     }
-    setLoading(false);
   };
 
   const downloadPDF = (content) => {
@@ -159,7 +208,7 @@ function App() {
     <div className="min-h-screen bg-[#020617] text-white flex flex-col p-4 md:p-8">
       <div className="max-w-3xl w-full mx-auto flex flex-col h-[85vh]">
         <header className="flex justify-between items-center mb-6">
-          <button onClick={() => setShowChat(false)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"><ChevronLeft size={20} /> Dashboard</button>
+          <button onClick={() => setShowChat(false)} className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"><ChevronLeft size={20} /> Dashboard (Esc)</button>
           <h2 className="text-lg font-bold text-blue-500">AI Assistant</h2>
         </header>
 
@@ -169,11 +218,11 @@ function App() {
               <div className="h-full flex flex-col items-center justify-center space-y-6">
                 <MessageSquare size={48} className="text-slate-800" />
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-sm">
-                  <button onClick={() => handleSend("Generate a leave letter for the HOD")} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:border-blue-500 transition-all text-left">
+                  <button disabled={isTyping} onClick={() => handleSend("Generate a leave letter for the HOD")} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:border-blue-500 transition-all text-left">
                     <FileText className="text-blue-400 mb-1" size={20} />
                     <p className="text-sm font-bold">Leave Letter</p>
                   </button>
-                  <button onClick={() => handleSend("Draft a Bonafide Certificate request")} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:border-purple-500 transition-all text-left">
+                  <button disabled={isTyping} onClick={() => handleSend("Draft a Bonafide Certificate request")} className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700 hover:border-purple-500 transition-all text-left">
                     <GraduationCap className="text-purple-400 mb-1" size={20} />
                     <p className="text-sm font-bold">Bonafide Request</p>
                   </button>
@@ -184,18 +233,33 @@ function App() {
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[85%] p-5 rounded-2xl ${msg.role === 'user' ? 'bg-blue-600 rounded-tr-none' : 'bg-slate-800 border border-slate-700 rounded-tl-none shadow-lg'}`}>
                   <p className="whitespace-pre-wrap text-[15px] leading-relaxed font-medium">{msg.content}</p>
-                  {msg.role === 'assistant' && (msg.content.includes("Subject:") || msg.content.includes("To,")) && (
+                  {msg.role === 'assistant' && !isTyping && (msg.content.includes("Subject:") || msg.content.includes("To,")) && (
                     <button onClick={() => downloadPDF(msg.content)} className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 p-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all">Download Official PDF</button>
                   )}
                 </div>
               </div>
             ))}
             {loading && <div className="text-blue-400 animate-pulse text-xs font-bold uppercase tracking-widest px-2">AI is drafting...</div>}
+            {/* Invisible element to anchor scroll */}
+            <div ref={chatEndRef} />
           </div>
           <div className="p-4 bg-slate-900 border-t border-slate-800">
             <div className="relative flex items-center max-w-2xl mx-auto w-full">
-              <input className="w-full bg-slate-950 border border-slate-800 p-4 pr-16 rounded-2xl outline-none focus:border-blue-500 transition-all" value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleSend()} placeholder="Type anything (e.g. 'hlo' or 'bonafide')..." />
-              <button onClick={() => handleSend()} className="absolute right-2 bg-blue-600 p-3 rounded-xl shadow-lg active:scale-95"><Send size={20} /></button>
+              <input 
+                className="w-full bg-slate-950 border border-slate-800 p-4 pr-16 rounded-2xl outline-none focus:border-blue-500 transition-all" 
+                value={input} 
+                disabled={isTyping}
+                onChange={(e) => setInput(e.target.value)} 
+                onKeyPress={(e) => e.key === 'Enter' && handleSend()} 
+                placeholder={isTyping ? "AI is typing..." : "Type anything (e.g. 'hlo' or 'bonafide')..."} 
+              />
+              <button 
+                onClick={() => handleSend()} 
+                disabled={isTyping}
+                className="absolute right-2 bg-blue-600 p-3 rounded-xl shadow-lg active:scale-95 disabled:bg-slate-700 disabled:text-slate-500"
+              >
+                <Send size={20} />
+              </button>
             </div>
           </div>
         </div>
