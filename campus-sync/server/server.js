@@ -1,13 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import fetch from 'node-fetch';
 
 dotenv.config();
+
 const app = express();
 app.use(express.json());
 app.use(cors());
 
+// Your specific SMVEC profile for the chatbot's "brain"
 const profile = {
   college: "Sri Manakula Vinayagar Engineering College",
   dept: "Computer Science and Engineering",
@@ -18,38 +20,48 @@ app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) return res.json({ reply: "API Key missing in Render settings." });
+  if (!apiKey) {
+    return res.json({ reply: "Chatbot Error: API Key is not configured in Render." });
+  }
 
   try {
-    const genAI = new GoogleGenerativeAI(apiKey);
+    // We use a direct fetch call to bypass library-level connection blocks
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
-    // We try gemini-1.5-flash first as it is designed for speed
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `You are CampusSync AI, the assistant for students at ${profile.college}. 
+            Student says: "${message}". 
+            If they ask for a leave letter or bonafide certificate, use their info: ${profile.dept} with ${profile.attendance} attendance. 
+            Be helpful, professional, and friendly.`
+          }]
+        }]
+      })
+    });
 
-    const prompt = `You are CampusSync AI for ${profile.college}. 
-    Student asks: "${message}". 
-    Use Dept: ${profile.dept} and Attendance: ${profile.attendance} for letter requests.`;
+    const data = await response.json();
 
-    // We add a timeout controller to stop the request from hanging
-    const result = await Promise.race([
-      model.generateContent(prompt),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 15000))
-    ]);
+    // Check if the API returned an error (like an invalid key)
+    if (data.error) {
+      console.error("Google API Error:", data.error.message);
+      return res.json({ reply: "The AI is currently sleepy. Please check if your API key is valid." });
+    }
 
-    const response = await result.response;
-    res.json({ reply: response.text() });
+    // Extract the text from the Gemini response structure
+    const botReply = data.candidates[0].content.parts[0].text;
+    res.json({ reply: botReply });
 
   } catch (error) {
-    console.error("Connection Error:", error.message);
-    
-    // Fallback: If it's a network glitch, try one more time with a simpler request
-    res.json({ 
-      reply: "The hostel network is blocking the AI connection. Try switching to a mobile hotspot for a second to verify, or try again now!" 
-    });
+    console.error("Fetch Error:", error.message);
+    res.json({ reply: "I'm having trouble connecting to the campus server. Please try again in a few seconds!" });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 SMVEC Backend Ready`);
+  console.log(`🚀 CampusSync Chatbot Live on Port ${PORT}`);
 });
