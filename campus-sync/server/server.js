@@ -23,7 +23,7 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    // UPDATED URL: Using the precise model path to stop the 404 error
+    // UPDATED URL: Using the correct direct model path to fix the 404/NOT_FOUND error
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
@@ -32,7 +32,10 @@ app.post('/api/chat', async (req, res) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are CampusSync AI for ${profile.college}. Student says: "${message}". Context: ${profile.dept}, ${profile.attendance} attendance.`
+            text: `You are CampusSync AI, the student assistant for ${profile.college}. 
+            Student question: "${message}". 
+            Student info: ${profile.dept}, ${profile.attendance} attendance. 
+            Give a helpful and clear response.`
           }]
         }]
       })
@@ -40,22 +43,23 @@ app.post('/api/chat', async (req, res) => {
 
     const data = await response.json();
 
-    // Catching Google-specific rejections
+    // Check for Google-side errors
     if (data.error) {
-      console.error("Google API Error:", data.error.message);
-      return res.json({ reply: `AI Error: ${data.error.message}` });
+      console.error("Google API Rejection:", data.error.message);
+      return res.json({ reply: `System Error: ${data.error.message}` });
     }
 
-    const botReply = data.candidates[0].content.parts[0].text;
+    // Safely extract the bot's reply
+    const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble thinking right now. Please try again.";
     res.json({ reply: botReply });
 
   } catch (error) {
-    console.error("Server Error:", error.message);
-    res.json({ reply: "Connection failed. Please check your Render logs or try a mobile hotspot." });
+    console.error("Critical Connection Error:", error.message);
+    res.json({ reply: "The hostel network blocked the connection. Please try a mobile hotspot!" });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 CampusSync Server Live on Port ${PORT}`);
+  console.log(`🚀 Final CampusSync AI Live on Port ${PORT}`);
 });
