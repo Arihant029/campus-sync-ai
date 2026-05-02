@@ -24,7 +24,7 @@ app.post('/api/chat', async (req, res) => {
 
   try {
     // SWITCHED TO v1 STABLE ENDPOINT
-    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
     
     console.log("--- Sending Request to Google v1 API ---");
     
