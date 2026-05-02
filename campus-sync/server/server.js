@@ -22,13 +22,11 @@ app.post('/api/chat', async (req, res) => {
     return res.json({ reply: "API Key is missing in Render environment variables." });
   }
 
-  // LOGGING: Check exactly what message is being sent
-  console.log(`--- Request for ${profile.college} ---`);
-  console.log("Input Message:", message);
-
   try {
-    // FIX for 404: Using the most stable v1beta URL format
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // SWITCHED TO v1 STABLE ENDPOINT
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    console.log("--- Sending Request to Google v1 API ---");
     
     const response = await fetch(url, {
       method: 'POST',
@@ -37,8 +35,8 @@ app.post('/api/chat', async (req, res) => {
         contents: [{
           parts: [{
             text: `You are CampusSync AI for ${profile.college}. 
-            Student asks: "${message}". 
-            Context: Student is in ${profile.dept} with ${profile.attendance} attendance.`
+            Respond to: "${message}". 
+            Context: ${profile.dept}, ${profile.attendance} attendance.`
           }]
         }]
       })
@@ -46,23 +44,25 @@ app.post('/api/chat', async (req, res) => {
 
     const data = await response.json();
 
-    // LOGGING: See if Google rejected the request
+    // DETAILED LOGGING: This will help us see the exact error if it persists
     if (data.error) {
-      console.error("❌ Google Rejection:", data.error.message);
-      return res.json({ reply: `AI System Error: ${data.error.message}` });
+      console.error("❌ GOOGLE REJECTION DETAILS:");
+      console.error("Status:", data.error.status);
+      console.error("Message:", data.error.message);
+      return res.json({ reply: `Google API Error: ${data.error.message}` });
     }
 
-    const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm processing, please try again!";
+    const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "The AI is processing, please try again!";
     console.log("✅ AI Response Successful");
     res.json({ reply: botReply });
 
   } catch (error) {
-    console.error("❌ Network Crash:", error.message);
-    res.json({ reply: "The hostel network blocked the connection. Please try a mobile hotspot!" });
+    console.error("❌ SERVER CRASH:", error.message);
+    res.json({ reply: "The hostel network is likely blocking this request. Try a mobile hotspot!" });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 CampusSync Backend Fully Operational on Port ${PORT}`);
+  console.log(`🚀 SMVEC Backend Fully Operational on Port ${PORT}`);
 });
