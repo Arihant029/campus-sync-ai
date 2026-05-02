@@ -19,11 +19,11 @@ app.post('/api/chat', async (req, res) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return res.json({ reply: "API Key is missing in Render environment variables." });
+    return res.json({ reply: "API Key is missing in Render settings." });
   }
 
   try {
-    // UPDATED URL: Using v1 for better stability and the correct model path
+    // FIX for 404: Using the correct v1 endpoint and model path
     const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
@@ -32,7 +32,7 @@ app.post('/api/chat', async (req, res) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are CampusSync AI for students at ${profile.college}. 
+            text: `You are CampusSync AI for ${profile.college}. 
             Student: "${message}". 
             Context: ${profile.dept}, ${profile.attendance} attendance.`
           }]
@@ -52,7 +52,7 @@ app.post('/api/chat', async (req, res) => {
 
   } catch (error) {
     console.error("Server Error:", error.message);
-    res.json({ reply: "Connection failed. Please try again from a mobile hotspot!" });
+    res.json({ reply: "Connection failed. Try switching to a mobile hotspot!" });
   }
 });
 
