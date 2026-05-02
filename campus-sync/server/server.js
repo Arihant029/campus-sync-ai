@@ -23,8 +23,8 @@ app.post('/api/chat', async (req, res) => {
   }
 
   try {
-    // Corrected endpoint URL to avoid the 404 error seen in your logs
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    // UPDATED URL: Using v1 for better stability and the correct model path
+    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
       method: 'POST',
@@ -32,10 +32,9 @@ app.post('/api/chat', async (req, res) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are CampusSync AI, an assistant for students at ${profile.college}. 
-            Student question: "${message}". 
-            Context: The student is in ${profile.dept} with ${profile.attendance} attendance. 
-            Provide a helpful, professional response.`
+            text: `You are CampusSync AI for students at ${profile.college}. 
+            Student: "${message}". 
+            Context: ${profile.dept}, ${profile.attendance} attendance.`
           }]
         }]
       })
@@ -45,7 +44,7 @@ app.post('/api/chat', async (req, res) => {
 
     if (data.error) {
       console.error("Google API Error:", data.error.message);
-      return res.json({ reply: `System Error: ${data.error.message}` });
+      return res.json({ reply: `Google Error: ${data.error.message}` });
     }
 
     const botReply = data.candidates[0].content.parts[0].text;
@@ -53,11 +52,11 @@ app.post('/api/chat', async (req, res) => {
 
   } catch (error) {
     console.error("Server Error:", error.message);
-    res.json({ reply: "I'm having trouble connecting to the AI right now. This usually happens on restricted hostel networks. Please try using a mobile hotspot!" });
+    res.json({ reply: "Connection failed. Please try again from a mobile hotspot!" });
   }
 });
 
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 CampusSync AI Server Live on Port ${PORT}`);
+  console.log(`🚀 SMVEC Backend Live on Port ${PORT}`);
 });
