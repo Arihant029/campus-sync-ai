@@ -18,12 +18,10 @@ app.post('/api/chat', async (req, res) => {
   const { message } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    return res.json({ reply: "API Key missing in Render settings." });
-  }
+  if (!apiKey) return res.json({ reply: "Missing API Key in Render." });
 
   try {
-    // UPDATED URL: Using the correct direct model path to fix the 404/NOT_FOUND error
+    // FIXED URL: Using v1beta which is required for the latest flash models
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
     
     const response = await fetch(url, {
@@ -32,10 +30,7 @@ app.post('/api/chat', async (req, res) => {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `You are CampusSync AI, the student assistant for ${profile.college}. 
-            Student question: "${message}". 
-            Student info: ${profile.dept}, ${profile.attendance} attendance. 
-            Give a helpful and clear response.`
+            text: `You are CampusSync AI for ${profile.college}. Student: "${message}". Context: ${profile.dept}, ${profile.attendance} attendance.`
           }]
         }]
       })
@@ -43,23 +38,19 @@ app.post('/api/chat', async (req, res) => {
 
     const data = await response.json();
 
-    // Check for Google-side errors
     if (data.error) {
-      console.error("Google API Rejection:", data.error.message);
-      return res.json({ reply: `System Error: ${data.error.message}` });
+      console.error("Google Error Details:", JSON.stringify(data.error));
+      // If still NOT_FOUND, it might be a regional block on Render's US servers
+      return res.json({ reply: `Google API says: ${data.error.message}` });
     }
 
-    // Safely extract the bot's reply
-    const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm having trouble thinking right now. Please try again.";
+    const botReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm processing, please try again.";
     res.json({ reply: botReply });
 
   } catch (error) {
-    console.error("Critical Connection Error:", error.message);
-    res.json({ reply: "The hostel network blocked the connection. Please try a mobile hotspot!" });
+    res.json({ reply: "Hostel network block detected. Try your mobile hotspot!" });
   }
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Final CampusSync AI Live on Port ${PORT}`);
-});
+app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Final Fix Live on ${PORT}`));
